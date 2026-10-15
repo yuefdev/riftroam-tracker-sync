@@ -16,6 +16,15 @@ class TrackerSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(SourceError, "HTTP 403"):
             tracker_data(session, "profile/riot/test")
 
+    def test_html_challenge_is_reported_without_response_contents(self):
+        session = Mock()
+        blocked = response({}, 403)
+        blocked.headers = {"cf-mitigated": "challenge"}
+        blocked.json.side_effect = ValueError("HTML challenge")
+        session.get.return_value = blocked
+        with self.assertRaisesRegex(SourceError, r"HTTP 403 \(access challenge\)"):
+            tracker_data(session, "profile/riot/test")
+
     def test_explicit_private_response_does_not_request_history(self):
         session = Mock()
         session.get.return_value = response({"errors": [{"code": "CollectorResultStatus::Private"}]})
@@ -23,6 +32,16 @@ class TrackerSourceTests(unittest.TestCase):
         self.assertEqual(snapshot["reason"], "private")
         self.assertIsNone(snapshot["profile"])
         self.assertEqual(session.get.call_count, 1)
+
+    def test_explicit_not_found_http_response_is_not_a_source_failure(self):
+        session = Mock()
+        session.get.return_value = response({"errors": [{"code": "CollectorResultStatus::NotFound"}]}, 404)
+        self.assertEqual(tracker_data(session, "profile/riot/test"), (None, "notFound"))
+
+    def test_explicit_private_http_response_is_not_an_access_challenge(self):
+        session = Mock()
+        session.get.return_value = response({"errors": [{"code": "CollectorResultStatus::Private"}]}, 403)
+        self.assertEqual(tracker_data(session, "profile/riot/test"), (None, "private"))
 
     def test_partial_history_failure_keeps_profile_and_encoded_riot_id(self):
         session = Mock()

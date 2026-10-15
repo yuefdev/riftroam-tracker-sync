@@ -17,19 +17,22 @@ class SourceError(Exception):
 
 def tracker_data(session, path):
     response = session.get(f"{TRACKER_API}/{path}", timeout=15)
-    if response.status_code != 200:
-        raise SourceError(f"Tracker HTTP {response.status_code}")
     if len(response.content) > MAX_RESPONSE_BYTES:
         raise SourceError("Tracker response too large")
     try:
         body = response.json()
     except ValueError:
-        raise SourceError("Tracker returned an access challenge") from None
-    codes = [error.get("code") for error in body.get("errors", [])]
-    if "CollectorResultStatus::Private" in codes:
+        body = None
+    codes = [error.get("code") for error in body.get("errors", [])] if isinstance(body, dict) else []
+    if response.status_code in (200, 403) and "CollectorResultStatus::Private" in codes:
         return None, "private"
-    if "CollectorResultStatus::NotFound" in codes:
+    if response.status_code in (200, 404) and "CollectorResultStatus::NotFound" in codes:
         return None, "notFound"
+    if response.status_code != 200:
+        challenge = " (access challenge)" if response.headers.get("cf-mitigated") == "challenge" else ""
+        raise SourceError(f"Tracker HTTP {response.status_code}{challenge}")
+    if body is None:
+        raise SourceError("Tracker returned an access challenge")
     if codes or not isinstance(body.get("data"), dict):
         raise SourceError("Tracker source unavailable")
     return body["data"], None
