@@ -1,6 +1,6 @@
 import unittest
-from unittest.mock import Mock
-from sync import SourceError, fetch_snapshot, tracker_data
+from unittest.mock import Mock, patch
+from sync import SourceError, fetch_snapshot, run, tracker_data
 
 
 def response(body, status=200):
@@ -51,6 +51,29 @@ class TrackerSourceTests(unittest.TestCase):
         self.assertEqual(snapshot["profile"], profile)
         self.assertIsNone(snapshot["history"])
         self.assertIn("%C3%87elik%20Pilot%23%EC%95%84%EC%9D%B4%EC%8A%A4", session.get.call_args_list[0].args[0])
+
+
+class HostedRefreshTests(unittest.TestCase):
+    def test_saved_accounts_refresh_from_the_free_source_without_tracker_requests(self):
+        account = {"region": "eu", "gameName": "Player", "tagLine": "TR1"}
+        api = Mock()
+        api.get.return_value = response({"accounts": [account], "next": None})
+        api.post.return_value = response({"ok": True})
+        with patch.dict("os.environ", {"PROFILE_SYNC_KEY": "test-key-" * 8}), patch("sync.requests.Session", return_value=api) as session:
+            self.assertEqual(run(), 0)
+        session.assert_called_once()
+        submitted = api.post.call_args.kwargs["json"]
+        self.assertEqual(submitted["source"], "opgg")
+        self.assertEqual(submitted["account"], account)
+        self.assertNotIn("profile", submitted)
+        api.close.assert_called_once()
+
+    def test_source_outages_fail_the_workflow_instead_of_reporting_success(self):
+        api = Mock()
+        api.get.return_value = response({"accounts": [{"region": "eu", "gameName": "Player", "tagLine": "TR1"}], "next": None})
+        api.post.return_value = response({}, 500)
+        with patch.dict("os.environ", {"PROFILE_SYNC_KEY": "test-key-" * 8}), patch("sync.requests.Session", return_value=api):
+            self.assertEqual(run(), 1)
 
 
 if __name__ == "__main__":

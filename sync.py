@@ -59,9 +59,6 @@ def run():
     key = os.environ.get("PROFILE_SYNC_KEY", "")
     if len(key) < 32:
         raise SourceError("PROFILE_SYNC_KEY is missing")
-    tracker = requests.Session(impersonate="chrome", headers={
-        "Accept": "application/json", "Origin": "https://tracker.gg", "Referer": "https://tracker.gg/"
-    })
     api = requests.Session(headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
     after = None
     success = failed = 0
@@ -75,8 +72,8 @@ def run():
             if time.monotonic() >= deadline:
                 break
             try:
-                snapshot = fetch_snapshot(tracker, account)
-                result = api.post(PROFILE_API, json=snapshot, timeout=15)
+                snapshot = {"source": "opgg", "account": account, "observedAt": int(time.time() * 1000)}
+                result = api.post(PROFILE_API, json=snapshot, timeout=30)
                 if result.status_code != 200:
                     raise SourceError(f"Snapshot upload HTTP {result.status_code}")
                 success += 1
@@ -87,7 +84,6 @@ def run():
         after = jobs.get("next")
         if not after:
             break
-    tracker.close()
     api.close()
     print(f"Updated {success} account(s); {failed} failure(s)")
     return 1 if failed else 0
