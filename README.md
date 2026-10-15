@@ -23,5 +23,5 @@ The updater calls the Bio Worker's `workers.dev` endpoint directly. Cloudflare
 Bot Fight Mode challenges GitHub-hosted runners on `bio.riftroam.com`; the direct
 endpoint runs the same Worker and still requires the shared secret.
 
-This repository is public so standard GitHub-hosted Linux runners use the free
+This repository is public so standard GitHub-hosted runners use the free
 public-repository allowance. It does not use paid runners or a rented server.
