@@ -5,7 +5,8 @@ import time
 from urllib.parse import quote
 from curl_cffi import requests
 
-PROFILE_API = "https://bio.riftroam.com/p/api/bot/valorant"
+# Use the same authenticated Worker without the custom domain's Bot Fight Mode.
+PROFILE_API = "https://riftroam-profile.ergyusuf34.workers.dev/p/api/bot/valorant"
 TRACKER_API = "https://api.tracker.gg/api/v2/valorant/standard"
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
